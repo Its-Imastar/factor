@@ -1,48 +1,51 @@
 using System;
-using System.Net;
-using System.Net.Http;
+using System.Net.WebSockets;
+using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
 
-class Program
+[Route("api/proxy")]
+public class ProxyController : ControllerBase
 {
-    static async Task Main()
+    private readonly string _targetUrl = "wss://example.com/socket"; // Replace with your game's WebSocket server URL
+
+    [HttpGet("websocket")]
+    public async Task WebSocketProxy(CancellationToken cancellationToken)
     {
-        HttpListener listener = new HttpListener();
-        listener.Prefixes.Add("http://*:8080/");
-        listener.Start();
-        Console.WriteLine("Proxy Server running on port 8080...");
-
-        while (true)
+        if (!HttpContext.WebSockets.IsWebSocketRequest)
         {
-            HttpListenerContext context = await listener.GetContextAsync();
-            string targetUrl = context.Request.QueryString["target"];
+            HttpContext.Response.StatusCode = 400;
+            return;
+        }
 
-            if (string.IsNullOrEmpty(targetUrl))
+        // Accept WebSocket connection
+        using (WebSocket webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync())
+        {
+            using (var clientSocket = new ClientWebSocket())
             {
-                context.Response.StatusCode = 400;
-                byte[] error = System.Text.Encoding.UTF8.GetBytes("Error: No target URL provided.");
-                await context.Response.OutputStream.WriteAsync(error, 0, error.Length);
-                context.Response.Close();
-                continue;
-            }
+                // Connect to the target WebSocket server
+                await clientSocket.ConnectAsync(new Uri(_targetUrl), cancellationToken);
 
-            try
-            {
-                using HttpClient client = new HttpClient();
-                HttpResponseMessage response = await client.GetAsync(targetUrl);
-                byte[] content = await response.Content.ReadAsByteArrayAsync();
+                // Start receiving messages from the client
+                var buffer = new byte[1024 * 4];
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    var result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), cancellationToken);
+                    if (result.MessageType == WebSocketMessageType.Close)
+                    {
+                        await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", cancellationToken);
+                        break;
+                    }
 
-                context.Response.StatusCode = (int)response.StatusCode;
-                context.Response.ContentType = response.Content.Headers.ContentType?.ToString() ?? "text/plain";
-                await context.Response.OutputStream.WriteAsync(content, 0, content.Length);
-            }
-            catch (Exception ex)
-            {
-                byte[] error = System.Text.Encoding.UTF8.GetBytes($"Proxy Error: {ex.Message}");
-                await context.Response.OutputStream.WriteAsync(error, 0, error.Length);
-            }
+                    // Forward the client message to the server
+                    await clientSocket.SendAsync(new ArraySegment<byte>(buffer, 0, result.Count), result.MessageType, result.EndOfMessage, cancellationToken);
 
-            context.Response.Close();
+                    // Read messages from the server and forward to client
+                    var serverBuffer = new byte[1024 * 4];
+                    var serverResult = await clientSocket.ReceiveAsync(new ArraySegment<byte>(serverBuffer), cancellationToken);
+                    await webSocket.SendAsync(new ArraySegment<byte>(serverBuffer, 0, serverResult.Count), serverResult.MessageType, serverResult.EndOfMessage, cancellationToken);
+                }
+            }
         }
     }
 }
