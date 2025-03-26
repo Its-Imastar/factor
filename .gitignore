@@ -1,0 +1,8 @@
+bin/
+obj/
+out/
+*.log
+*.tmp
+*.swp
+.env
+.vscode/
