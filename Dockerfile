@@ -1,16 +1,17 @@
 # Use the official .NET SDK image
-FROM mcr.microsoft.com/dotnet/sdk:8.0
-
-# Set the working directory inside the container
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /app
 
-# Copy the project file and restore dependencies
+# Copy and restore project dependencies
 COPY CSharpProxy.csproj ./
 RUN dotnet restore
 
-# Copy the entire project and build it
+# Copy the rest of the files and build the project
 COPY . ./
-RUN dotnet publish -c Release -o out
+RUN dotnet publish -c Release -o /out
 
-# Set the entry point for the container
-CMD ["dotnet", "out/CSharpProxy.dll"]
+# Use a smaller runtime image for the final container
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
+WORKDIR /app
+COPY --from=build /out .
+CMD ["dotnet", "CSharpProxy.dll"]
