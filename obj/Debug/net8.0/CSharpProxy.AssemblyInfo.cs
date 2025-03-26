@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("CSharpProxy")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0625e42e3fa1480ef2ca1dd1504fd5afc2db7178")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+12866c3deec2884e70fa7e5659d73ee29d01cdb7")]
 [assembly: System.Reflection.AssemblyProductAttribute("CSharpProxy")]
 [assembly: System.Reflection.AssemblyTitleAttribute("CSharpProxy")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
